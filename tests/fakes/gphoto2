@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Stand-in for gphoto2 in tests: answers like an EOS RP and "saves" empty photos.
+# FAKE_CAMERA=missing  -> no camera found
+# FAKE_REJECT=<text>   -> --set-config-value fails for config paths containing <text>
+case "$1" in
+  --auto-detect)
+    echo "Model                          Port"
+    echo "----------------------------------------------------------"
+    [[ "${FAKE_CAMERA:-}" == missing ]] || echo "Canon EOS RP                   usb:020,005" ;;
+  --set-config-value)
+    [[ -n "${FAKE_REJECT:-}" && "$2" == *"$FAKE_REJECT"* ]] && exit 1
+    exit 0 ;;
+  --get-config)
+    echo "Label: fake"; echo "Current: fake" ;;
+  --capture-image-and-download)
+    base="${3%.%C}"
+    touch "$base.CR3" "$base.JPG"
+    echo "Saving file as $base.CR3"; echo "Saving file as $base.JPG" ;;
+esac

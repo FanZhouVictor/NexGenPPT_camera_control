@@ -1,0 +1,3 @@
+#!/bin/sh
+# Test stand-in: EOS Utility is never running.
+exit 1

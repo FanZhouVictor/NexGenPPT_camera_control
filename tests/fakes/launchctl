@@ -1,0 +1,3 @@
+#!/bin/sh
+# Test stand-in: does nothing.
+exit 0

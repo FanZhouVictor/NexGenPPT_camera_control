@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Stand-in for digiCamControl's CameraControlRemoteCmd.exe in tests. Answers in the same format:
+#   :;response:"100";
+# Property values are kept as files in $FAKE_DCC_STATE. "capture" drops a CR3 + JPG into session.folder.
+# Like the real one, photos arrive as DSC_0003.jpg + DSC_0004.cr3 (lowercase, separate counters).
+# FAKE_DCC=nocamera -> no camera listed;  FAKE_DCC=jpegonly -> capture saves no RAW file
+# FAKE_DCC=cameraonly -> transfer is "Save to camera only"
+state="${FAKE_DCC_STATE:?}"; mkdir -p "$state"
+echo "digiCamControl remote command line utility (2.1.6.0, 2/14/2023 1:38:06 PM) running"; echo
+[[ "$1" == "/c" ]] || exit 1
+case "$2" in
+  list)
+    if [[ "$3" == cameras ]]; then
+      [[ "${FAKE_DCC:-}" == nocamera ]] && echo ':;response:[];' || echo ':;response:["292027001666"];'
+    else echo ':;response:error;message:Unknow parameter'; fi ;;
+  get)
+    if [[ -f "$state/$3" ]]; then echo ":;response:\"$(cat "$state/$3")\";"
+    elif [[ "$3" == mode ]]; then echo ':;response:"M";'
+    elif [[ "$3" == transfer ]]; then
+      [[ "${FAKE_DCC:-}" == cameraonly ]] && echo ':;response:"Save to camera only";' || echo ':;response:"Save to PC only";'
+    else echo ':;response:null;'; fi ;;
+  set) printf '%s' "$4" > "$state/$3"; echo ':;response:null;' ;;
+  capture)
+    folder="$(cat "$state/session.folder")"
+    ( sleep 0.5; touch "$folder/DSC_0003.jpg"; [[ "${FAKE_DCC:-}" == jpegonly ]] || touch "$folder/DSC_0004.cr3" ) &
+    echo ':;response:null;' ;;
+esac

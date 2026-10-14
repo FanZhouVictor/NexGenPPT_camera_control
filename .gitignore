@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# Captured images and per-capture logs — never commit these
+*.cr3
+*.CR3
+*.jpg
+*.jpeg
+*.JPG
+*.JPEG
+data/raw/camera_sessions/*
+!data/raw/camera_sessions/.gitkeep
+
+# Editor / AI tooling
+.claude/
+.idea/
+.vscode/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
