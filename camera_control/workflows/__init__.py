@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 
-from camera_control.workflows.single_specimen import SingleSpecimenPage
+from camera_control.workflows.specimen_photos import SpecimenPhotosPage
 
 
 @dataclass(frozen=True)
@@ -16,16 +16,8 @@ class Workflow:
 
 WORKFLOWS = [
     Workflow(
-        "single_specimen", "One specimen",
-        "A single piece alone on the paper · 4 photos, you rotate it halfway.",
-        SingleSpecimenPage,
-    ),
-    Workflow(
-        "batch_paper", "Batch paper",
-        "Several numbered pieces on one paper · 2 photos, no rotation.",
-    ),
-    Workflow(
-        "decon_wash_set", "Decon wash set",
-        "Pieces 1–4 and the baseline, one at a time · 4 photos per piece.",
+        "specimen_photos", "Specimen photos",
+        "One specimen alone: 4 photos, you rotate it halfway · Several pieces together: 2 photos.",
+        SpecimenPhotosPage,
     ),
 ]

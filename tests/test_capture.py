@@ -16,14 +16,46 @@ from unittest import mock
 
 from camera_control.camera_check import CameraCheck
 from camera_control.capture.cameras import CameraError, DigiCamControlCamera, Gphoto2Camera
-from camera_control.capture.case_capture import capture_case
-from camera_control.capture.case_rules import InvalidCase, check_case
+from camera_control.capture.case_capture import capture_batch, capture_case
 from camera_control.capture.preflight import run_preflight
 from camera_control.capture.run import CaptureRun
+from camera_control.capture.specimen import (
+    InvalidSpecimen, batch_folder_name, batch_name, batch_summary, check_batch, check_specimen, duration,
+    folder_name, known_pieces, specimen_name, summary,
+)
 
 FAKES = Path(__file__).resolve().parent / "fakes"
 TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}-\d{6}")
-CASE_ARGS = ["--test", "C187", "--coupon", "parent", "--treatment", "none", "--stage", "pre_exposure"]
+PARENT = {
+    "sample_id": "C187", "object": "parent", "piece": None, "pieces_total": None, "description": None,
+    "contamination": "before",
+    "aged": "no", "aged_for": None,
+    "washed": "no", "wash_condition": None, "since_wash": None, "wetness": None, "order": None,
+    "notes": "",
+}
+PIECE = {
+    **PARENT, "sample_id": "C205", "object": "piece", "piece": "P2", "pieces_total": 4,
+    "contamination": "after",
+    "aged": "yes", "aged_for": {"value": 7.0, "unit": "days"},
+    "washed": "yes", "wash_condition": "PER", "since_wash": {"value": 6.0, "unit": "hours"}, "wetness": "dry",
+    "order": "aged_then_washed",
+}
+CLEAN = {key: PARENT[key] for key in (
+    "contamination", "aged", "aged_for", "washed", "wash_condition", "since_wash", "wetness", "order")}
+WASHED = {key: PIECE[key] for key in CLEAN}
+# Three of the four pieces in one picture, left to right; the last one has been aged and washed.
+BATCH = {
+    "sample_id": "C205", "object": "pieces", "pieces_total": 4, "notes": "",
+    "pieces": [
+        {"piece": "P1", "position": 1, **CLEAN},
+        {"piece": "P2", "position": 2, **CLEAN},
+        {"piece": "P4", "position": 3, **WASHED},
+    ],
+}
+
+
+def same_condition(batch, condition):
+    return {**batch, "pieces": [{**piece, **condition} for piece in batch["pieces"]]}
 
 
 def masked(text):
@@ -52,24 +84,112 @@ def camera_check():
     return check
 
 
-class CaseRules(unittest.TestCase):
-    def test_valid_cases(self):
-        check_case("C187", "parent", "none", "pre_exposure")
-        check_case("C187", "parent", "as_exposed", "post_exposure")
-        check_case("C187", "parent", "env_aging_7d", "post_exposure_aged")
-        check_case("C194", "left_center", "PER", "post_treatment")
+class Specimens(unittest.TestCase):
+    def test_names(self):
+        self.assertEqual(specimen_name(PARENT), "C187_parent")
+        self.assertEqual(specimen_name(PIECE), "C205_P2")
+        self.assertEqual(specimen_name({**PARENT, "object": "other", "description": "offcut"}), "C187_other")
 
-    def test_invalid_cases(self):
-        for case in [
-            ("187", "parent", "none", "pre_exposure"),
-            ("C187", "top", "none", "pre_exposure"),
-            ("C187", "parent", "PER", "pre_exposure"),
-            ("C187", "left", "env_aging_7d", "post_exposure_aged"),
-            ("C187", "parent", "PER", "post_treatment"),
-            ("C187", "left", "none", "pre_exposure"),
+    def test_folder_names_say_the_condition(self):
+        self.assertEqual(folder_name(PARENT), "C187_parent_clean")
+        self.assertEqual(folder_name(PIECE), "C205_P2_contam_aged7d_washed")
+        self.assertEqual(folder_name({**PIECE, "aged_for": "unknown"}), "C205_P2_contam_aged_washed")
+        self.assertEqual(folder_name({**PIECE, "aged_for": {"value": 1.5, "unit": "hours"}}),
+                         "C205_P2_contam_aged1.5h_washed")
+
+    def test_summary(self):
+        self.assertEqual(summary(PARENT), "C187 · whole parent · before contamination · not aged · not washed")
+        self.assertEqual(
+            summary(PIECE),
+            "C205 · P2 · after contamination · aged 7 days · 6 hours after wash (PER) · dry · aged, then washed",
+        )
+
+    def test_any_combination_of_answers_is_allowed(self):
+        check_specimen(PARENT)
+        check_specimen(PIECE)
+        check_specimen({**PIECE, "contamination": "before", "washed": "no", "wetness": None, "order": None})
+        check_specimen({**PARENT, "aged": "yes", "aged_for": "unknown"})
+
+    def test_missing_answers(self):
+        for change, problem in [
+            ({"sample_id": ""}, "sample ID"),
+            ({"sample_id": "C 187/a"}, "letters, numbers"),
+            ({"object": None}, "what you are photographing"),
+            ({"object": "piece", "pieces_total": 4}, "which piece"),
+            ({"object": "piece", "piece": "P5", "pieces_total": 4}, "which piece"),
+            ({"object": "piece", "piece": "P1"}, "how many pieces"),
+            ({"object": "other"}, "Describe"),
+            ({"contamination": None}, "contamination"),
+            ({"contamination": "unknown"}, "contamination"),
+            ({"aged": "unknown"}, "aged"),
+            ({"washed": "unknown"}, "washed"),
+            ({"washed": "yes", "wetness": "unknown"}, "how wet"),
+            ({"aged": None}, "aged"),
+            ({"washed": "yes"}, "how wet"),
+            ({"aged": "yes", "washed": "yes", "wetness": "dry"}, "first"),
         ]:
-            with self.subTest(case=case), self.assertRaises(InvalidCase):
-                check_case(*case)
+            with self.subTest(change=change), self.assertRaisesRegex(InvalidSpecimen, problem):
+                check_specimen({**PARENT, **change})
+
+    def test_several_pieces_in_one_picture(self):
+        check_batch(BATCH)
+        self.assertEqual(batch_name(BATCH), "C205_P1-P2-P4")
+        self.assertEqual(batch_folder_name(BATCH), "C205_P1-P2-P4")   # conditions differ, so none in the name
+        self.assertEqual(batch_summary(BATCH).splitlines(), [
+            "C205 · P1, P2, P4 left to right",
+            "P1 · before contamination · not aged · not washed",
+            "P2 · before contamination · not aged · not washed",
+            "P4 · after contamination · aged 7 days · 6 hours after wash (PER) · dry · aged, then washed",
+        ])
+        alike = same_condition(BATCH, WASHED)
+        self.assertEqual(batch_folder_name(alike), "C205_P1-P2-P4_contam_aged7d_washed")
+        self.assertEqual(
+            batch_summary(alike),
+            "C205 · P1, P2, P4 left to right · all after contamination · aged 7 days · "
+            "6 hours after wash (PER) · dry · aged, then washed",
+        )
+
+    def test_problems_with_several_pieces(self):
+        pieces = BATCH["pieces"]
+        for change, problem in [
+            ({"sample_id": ""}, "sample ID"),
+            ({"pieces_total": None}, "how many pieces"),
+            ({"pieces": pieces[:1]}, "which pieces"),
+            ({"pieces": [pieces[0], pieces[0]]}, "only be on the paper once"),
+            ({"pieces": [pieces[0], {**pieces[1], "piece": "P9"}]}, "which piece"),
+            ({"pieces": [pieces[0], {**pieces[1], "washed": None}]}, "P2: Choose whether it was washed"),
+        ]:
+            with self.subTest(change=change), self.assertRaisesRegex(InvalidSpecimen, problem):
+                check_batch({**BATCH, **change})
+
+    def test_pieces_can_be_renamed(self):
+        names = ["L", "ML", "MR", "R"]
+        renamed = {**PIECE, "piece": "ML", "piece_names": names}
+        check_specimen(renamed)
+        self.assertEqual(specimen_name(renamed), "C205_ML")
+        self.assertEqual(summary(renamed).split(" · ")[1], "ML")
+        batch = {**BATCH, "piece_names": names, "pieces": [
+            {**BATCH["pieces"][0], "piece": "L"}, {**BATCH["pieces"][1], "piece": "R"}]}
+        check_batch(batch)
+        self.assertEqual(batch_name(batch), "C205_L-R")
+        for change, problem in [
+            ({"piece": "P2"}, "which piece"),                       # the old name is gone
+            ({"piece_names": ["L", "ML", "MR"]}, "4 different piece names"),
+            ({"piece_names": ["L", "ML", "ml", "R"]}, "different piece names"),
+            ({"piece_names": ["L", "M-L", "MR", "R"]}, "letters and numbers only"),
+            ({"piece_names": ["L", "ML", "MR", "farrightend"]}, "up to 8"),
+        ]:
+            with self.subTest(change=change), self.assertRaisesRegex(InvalidSpecimen, problem):
+                check_specimen({**renamed, **change})
+
+    def test_times(self):
+        self.assertEqual(duration("", "hours"), "unknown")
+        self.assertEqual(duration(" 1,5 ", "days"), {"value": 1.5, "unit": "days"})
+        self.assertEqual(summary({**PARENT, "aged": "yes", "aged_for": duration("1", "days")}).split(" · ")[3],
+                         "aged 1 day")
+        for text in ("soon", "-2", "inf"):
+            with self.subTest(text=text), self.assertRaises(InvalidSpecimen):
+                duration(text, "hours")
 
 
 class FakeToolTest(unittest.TestCase):
@@ -98,14 +218,17 @@ class FakeToolTest(unittest.TestCase):
         return sorted(masked(p.name) for p in (self.tmp / "out").rglob("*") if p.is_file())
 
     def assert_case_saved(self):
-        exit_code, lines = run_job(capture_case, CASE_ARGS)
+        exit_code, lines = run_job(capture_case, PARENT)
         self.assertEqual(exit_code, 0, lines[-3:])
         names = self.saved_names()
         self.assertEqual(len(names), 13)   # 4 photos x (CR3, JPG, log) + manifest
-        self.assertIn("<time>-C187_parent_none_pre_exposure_0deg_r01.CR3", names)
-        self.assertIn("<time>-C187_parent_none_pre_exposure_180deg_r02.JPG", names)
+        self.assertIn("<time>-C187_parent_0deg_r01.CR3", names)
+        self.assertIn("<time>-C187_parent_180deg_r02.JPG", names)
         manifest = json.loads(next((self.tmp / "out").rglob("case_manifest.json")).read_text())
-        self.assertEqual([frame["rotation_deg"] for frame in manifest["frames"]], [0, 0, 180, 180])
+        self.assertEqual([(frame["rotation_deg"], frame["rep"]) for frame in manifest["frames"]],
+                         [(0, 1), (0, 2), (180, 1), (180, 2)])
+        self.assertEqual({key: manifest[key] for key in PARENT}, PARENT)
+        self.assertEqual(manifest["summary"], summary(PARENT))
 
 
 @unittest.skipUnless(os.name == "posix", "the fake gphoto2 is a shell script")
@@ -138,6 +261,45 @@ class Gphoto2Capture(FakeToolTest):
 
     def test_case_capture(self):
         self.assert_case_saved()
+
+    def test_piece_capture_saves_every_answer_and_remembers_the_piece_count(self):
+        exit_code, lines = run_job(capture_case, PIECE)
+        self.assertEqual(exit_code, 0, lines[-3:])
+        self.assertIn("<time>-C205_P2_180deg_r02.CR3", self.saved_names())
+        folder = next((self.tmp / "out").rglob("case_manifest.json")).parent.name
+        self.assertRegex(folder, r"^C205_P2_contam_aged7d_washed_\d{6}$")
+        manifest = json.loads(next((self.tmp / "out").rglob("case_manifest.json")).read_text())
+        self.assertEqual({key: manifest[key] for key in PIECE}, PIECE)
+        self.assertEqual(known_pieces(self.tmp / "out", "C205"), ["P1", "P2", "P3", "P4"])
+        self.assertIsNone(known_pieces(self.tmp / "out", "C187"))
+
+    def test_several_pieces_get_two_photos_and_no_rotation(self):
+        exit_code, lines = run_job(capture_batch, BATCH)
+        self.assertEqual(exit_code, 0, lines[-3:])
+        self.assertFalse(any("PAUSE" in line for line in lines))
+        names = self.saved_names()
+        self.assertEqual(len(names), 8)   # 2 photos x (CR3, JPG, log) + manifest + samples.json
+        self.assertIn("<time>-C205_P1-P2-P4_0deg_r02.CR3", names)
+        manifest = json.loads(next((self.tmp / "out").rglob("case_manifest.json")).read_text())
+        self.assertEqual(manifest["pieces"], BATCH["pieces"])
+        self.assertEqual([(piece["piece"], piece["position"]) for piece in manifest["pieces"]],
+                         [("P1", 1), ("P2", 2), ("P4", 3)])
+        self.assertEqual(manifest["rotations_deg"], [0])
+        self.assertEqual([(frame["rotation_deg"], frame["rep"]) for frame in manifest["frames"]], [(0, 1), (0, 2)])
+        self.assertEqual(known_pieces(self.tmp / "out", "C205"), ["P1", "P2", "P3", "P4"])
+
+    def test_renamed_pieces_are_remembered_for_the_sample(self):
+        names = ["L", "ML", "MR", "R"]
+        exit_code, lines = run_job(capture_case, {**PIECE, "piece": "MR", "piece_names": names})
+        self.assertEqual(exit_code, 0, lines[-3:])
+        self.assertIn("<time>-C205_MR_0deg_r01.CR3", self.saved_names())
+        self.assertEqual(known_pieces(self.tmp / "out", "C205"), names)
+
+    def test_incomplete_answers_stop_the_capture(self):
+        exit_code, lines = run_job(capture_case, {**PARENT, "aged": None})
+        self.assertEqual(exit_code, 1)
+        self.assertIn("aged", lines[-1])
+        self.assertEqual(self.saved_names(), [])
 
 
 @unittest.skipUnless(os.name == "posix", "the fake digiCamControl is a shell script")
@@ -187,7 +349,7 @@ class DigiCamControlCapture(FakeToolTest):
     def test_photo_without_raw_file_is_an_error(self):
         os.environ["FAKE_DCC"] = "jpegonly"
         with mock.patch.object(DigiCamControlCamera, "DOWNLOAD_TIMEOUT", 4):
-            exit_code, lines = run_job(capture_case, CASE_ARGS)
+            exit_code, lines = run_job(capture_case, PARENT)
         self.assertEqual(exit_code, 1)
         self.assertIn("RAW", lines[-1])
 

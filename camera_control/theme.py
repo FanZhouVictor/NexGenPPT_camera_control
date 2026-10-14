@@ -5,6 +5,7 @@ from customtkinter import ThemeManager
 PRIMARY = "#2563EB"
 PRIMARY_HOVER = "#1D4ED8"
 PRIMARY_SUBTLE = "#E8F0FE"
+PRIMARY_PICKED = "#9DBBF7"   # the chosen answer in a row of choices; dark text stays readable on it
 ON_PRIMARY = "#FFFFFF"
 
 SIDEBAR = "#EEF4FE"

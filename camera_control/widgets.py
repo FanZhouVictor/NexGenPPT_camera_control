@@ -10,28 +10,48 @@ def section_label(parent, text, first=False):
     ).pack(fill="x", pady=(0 if first else 20, 8))
 
 
-def labeled_entry(parent, label, placeholder, on_change):
-    ctk.CTkLabel(parent, text=label, font=theme.font(14), anchor="w").pack(fill="x")
-    entry = ctk.CTkEntry(parent, placeholder_text=placeholder, height=38, font=theme.font(14))
-    entry.pack(fill="x", pady=(2, 12))
+def form_row(parent, label, detail=False):
+    # One line of a form: the label on the left, its controls packed into the returned frame.
+    # A detail row is a follow-up to the question above it.
+    row = ctk.CTkFrame(parent, fg_color="transparent")
+    ctk.CTkLabel(
+        row, text=label, width=104, anchor="w", font=theme.font(13 if detail else 14),
+        text_color=theme.TEXT_MUTED if detail else theme.TEXT,
+    ).pack(side="left")
+    return row
+
+
+def choice_buttons(row, values, on_change):
+    # Pick one of a few answers. Nothing is picked to start with.
+    buttons = ctk.CTkSegmentedButton(
+        row, values=values, height=28, font=theme.font(13), command=lambda _: on_change(),
+        fg_color=theme.PRIMARY_SUBTLE, unselected_color=theme.PRIMARY_SUBTLE,
+        unselected_hover_color=theme.SIDEBAR_HOVER, selected_color=theme.PRIMARY_PICKED,
+        selected_hover_color=theme.PRIMARY_PICKED, text_color=theme.TEXT, text_color_disabled=theme.TEXT_MUTED,
+    )
+    buttons.pack(side="left")
+    return buttons
+
+
+def row_entry(row, placeholder, on_change, width=None):
+    entry = ctk.CTkEntry(row, placeholder_text=placeholder, height=28, width=width or 140, font=theme.font(13))
+    entry.pack(side="left", fill="x" if width is None else "none", expand=width is None)
     entry.bind("<KeyRelease>", lambda _: on_change())
     return entry
 
 
-def labeled_choice(parent, label, on_change):
-    ctk.CTkLabel(parent, text=label, font=theme.font(14), anchor="w").pack(fill="x")
-    box = ctk.CTkComboBox(
-        parent, values=[], state="readonly", height=38, font=theme.font(14),
-        command=lambda _: on_change(),
+def row_menu(row, values, on_change, width=96):
+    menu = ctk.CTkOptionMenu(
+        row, values=values, width=width, height=28, font=theme.font(13), dropdown_font=theme.font(13),
+        fg_color=theme.PRIMARY_SUBTLE, button_color=theme.SIDEBAR_HOVER, button_hover_color=theme.SIDEBAR_HOVER,
+        text_color=theme.TEXT, command=lambda _: on_change(),
     )
-    box.pack(fill="x", pady=(2, 12))
-    return box
+    menu.pack(side="left", padx=(6, 0))
+    return menu
 
 
-def set_choices(box, values):
-    box.configure(values=values)
-    if box.get() not in values:
-        box.set(values[0])
+def row_text(row, text):
+    ctk.CTkLabel(row, text=text, font=theme.font(13), text_color=theme.TEXT_MUTED).pack(side="left", padx=6)
 
 
 def secondary_button(parent, text, command, **options):

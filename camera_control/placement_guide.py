@@ -1,5 +1,6 @@
 # Drawing of how to place a specimen on the rig, with a caption for the current step.
 # The specimen turns 180° from `rotate_at` onwards; the ColorChecker never moves.
+# Several pieces in one picture are drawn side by side, left to right, and are not turned.
 
 import tkinter as tk
 
@@ -31,7 +32,8 @@ class PlacementGuide(ctk.CTkFrame):
         self.steps = steps
         self.rotate_at = rotate_at
         self.idle_caption = idle_caption
-        self.specimen_label = "C187"
+        self.labels = ["C205"]
+        self.share = 1
 
         self.canvas = tk.Canvas(self, width=WIDTH, height=HEIGHT, bg=theme.CARD, highlightthickness=0)
         self.canvas.pack(anchor="w")
@@ -45,8 +47,9 @@ class PlacementGuide(ctk.CTkFrame):
 
     def show(self, done, current=None):
         total = len(self.steps)
+        turns = self.rotate_at is not None
         if done >= total:
-            self._draw_rig(rotated=True, rotating=False)
+            self._draw_rig(rotated=turns, rotating=False)
             self.step_label.configure(text="All steps done")
             self.caption.configure(text="Stage the next specimen: label at the top, all four edges on the white paper.")
         elif current is None:
@@ -54,13 +57,16 @@ class PlacementGuide(ctk.CTkFrame):
             self.step_label.configure(text=f"{total} steps")
             self.caption.configure(text=self.idle_caption)
         else:
-            self._draw_rig(rotated=current >= self.rotate_at, rotating=current == self.rotate_at)
+            self._draw_rig(rotated=turns and current >= self.rotate_at, rotating=current == self.rotate_at)
             self.step_label.configure(text=f"Step {current + 1} of {total}")
             self.caption.configure(text=self.steps[current])
 
-    def set_specimen_label(self, text):
-        # The label written on the specimen, e.g. "C187"; drawn upside down once rotated.
-        self.specimen_label = text
+    def set_layout(self, labels, steps, rotate_at, idle_caption, share=1):
+        # labels: what is written on each specimen on the paper, left to right, e.g. ["P1", "P2"].
+        # rotate_at is None when the capture has no rotation.
+        # share: how much of the parent's width each specimen has; a piece cut from 4 has 1/4.
+        self.labels, self.steps, self.rotate_at, self.idle_caption = labels, steps, rotate_at, idle_caption
+        self.share = share
 
     def _draw_rig(self, rotated, rotating):
         # Proportions follow a real capture: the A3 sheet fills most of the frame, the specimen
@@ -72,20 +78,27 @@ class PlacementGuide(ctk.CTkFrame):
         sheet = (12, 18, 230, 172)
         c.create_rectangle(*sheet, fill=SHEET, outline=SHEET_EDGE)
 
-        x0, y0, x1, y1 = sheet[0] + 5, sheet[1] + 5, sheet[2] - 5, sheet[3] - 5
-        c.create_rectangle(x0, y0, x1, y1, fill=FABRIC, outline=FABRIC_EDGE, width=2)
-        middle, centre = (x0 + x1) / 2, (y0 + y1) / 2
-        # The label (test ID) sits on the specimen's top edge, with the TOP arrow pointing at it.
+        # Each specimen's label sits on its top edge, with the TOP arrow pointing at it.
         # After rotating, both are at the bottom and the label is upside down.
-        if rotated:
-            c.create_text(middle, y1 - 14, text=self.specimen_label, angle=180,
-                          font=theme.font(10), fill=FABRIC_EDGE)
-            c.create_line(middle, y1 - 50, middle, y1 - 28, arrow=tk.LAST, width=2, fill=theme.TEXT)
-            c.create_text(middle, y1 - 60, text="TOP", font=theme.font(11, bold=True), fill=theme.TEXT)
-        else:
-            c.create_text(middle, y0 + 14, text=self.specimen_label, font=theme.font(10), fill=FABRIC_EDGE)
-            c.create_line(middle, y0 + 50, middle, y0 + 28, arrow=tk.LAST, width=2, fill=theme.TEXT)
-            c.create_text(middle, y0 + 60, text="TOP", font=theme.font(11, bold=True), fill=theme.TEXT)
+        x0, y0, x1, y1 = sheet[0] + 5, sheet[1] + 5, sheet[2] - 5, sheet[3] - 5
+        centre = (y0 + y1) / 2
+        # Cut pieces are drawn at their real share of the parent, in the middle of the paper.
+        space = 4
+        width = (x1 - x0) * self.share - (space if self.share < 1 else 0)
+        start = (x0 + x1) / 2 - (len(self.labels) * (width + space) - space) / 2
+        for index, label in enumerate(self.labels):
+            left = start + index * (width + space)
+            c.create_rectangle(left, y0, left + width, y1, fill=FABRIC, outline=FABRIC_EDGE, width=2)
+            middle = left + width / 2
+            if rotated:
+                c.create_text(middle, y1 - 14, text=label, angle=180, font=theme.font(10), fill=FABRIC_EDGE)
+                c.create_line(middle, y1 - 50, middle, y1 - 28, arrow=tk.LAST, width=2, fill=theme.TEXT)
+                c.create_text(middle, y1 - 60, text="TOP", font=theme.font(11, bold=True), fill=theme.TEXT)
+            else:
+                c.create_text(middle, y0 + 14, text=label, font=theme.font(10), fill=FABRIC_EDGE)
+                c.create_line(middle, y0 + 50, middle, y0 + 28, arrow=tk.LAST, width=2, fill=theme.TEXT)
+                if width >= 40:
+                    c.create_text(middle, y0 + 60, text="TOP", font=theme.font(11, bold=True), fill=theme.TEXT)
 
         patch, gap = 8, 2
         card_width = 4 * (patch + gap) + gap
@@ -101,6 +114,6 @@ class PlacementGuide(ctk.CTkFrame):
                 c.create_rectangle(x, y, x + patch, y + patch, fill=colour, width=0)
 
         if rotating:
-            side = (x0 + middle) / 2
+            side = x0 + (x1 - x0) / 4
             c.create_text(side, centre - 8, text="↻", font=theme.font(26, bold=True), fill=theme.PRIMARY)
             c.create_text(side, centre + 18, text="180°", font=theme.font(10, bold=True), fill=theme.PRIMARY)

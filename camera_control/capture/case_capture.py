@@ -1,15 +1,21 @@
 # One specimen: 2 photos at 0°, pause for the 180° turn, 2 more photos, then case_manifest.json.
+# Several pieces in one picture: 2 photos at 0° and no turn.
 
 import datetime
 import json
 import os
+import re
 from pathlib import Path
 
 from camera_control.capture.cameras import CameraError, camera_for_this_computer
-from camera_control.capture.case_rules import InvalidCase, case_slug, check_case
+from camera_control.capture.specimen import (
+    InvalidSpecimen, batch_folder_name, batch_name, batch_summary, check_batch, check_specimen, folder_name,
+    piece_names, remember_pieces, specimen_name, summary,
+)
 from camera_control.system import PROJECT_ROOT
 
 ROTATIONS = [0, 180]
+BATCH_ROTATIONS = [0]
 REPS_PER_ROTATION = 2
 PREFIX = "[acquire_case]"
 
@@ -18,36 +24,46 @@ def output_root():
     return Path(os.environ.get("CAMERA_OUTPUT_ROOT") or PROJECT_ROOT / "data" / "raw" / "camera_sessions")
 
 
-def parse_args(args):
-    # ["--test", "C187", "--coupon", "parent", ...] -> {"test": "C187", "coupon": "parent", ...}
-    return {args[i].lstrip("-"): args[i + 1] for i in range(0, len(args) - 1, 2)}
+def capture_case(run, specimen):
+    # specimen: the answers from the specimen form (see specimen.py).
+    _checked(check_specimen, specimen)
+    _capture(run, specimen, specimen_name(specimen), folder_name(specimen), summary(specimen), ROTATIONS)
 
 
-def capture_case(run, args):
-    options = parse_args(args)
-    test, coupon, treatment, stage = (options.get(k, "") for k in ("test", "coupon", "treatment", "stage"))
+def capture_batch(run, batch):
+    # batch: several pieces of one sample in the same picture (see specimen.py).
+    _checked(check_batch, batch)
+    _capture(run, batch, batch_name(batch), batch_folder_name(batch), batch_summary(batch), BATCH_ROTATIONS)
+
+
+def _checked(check, record):
     try:
-        check_case(test, coupon, treatment, stage)
-    except InvalidCase as error:
+        check(record)
+    except InvalidSpecimen as error:
         raise CameraError(str(error))
 
-    slug = case_slug(test, coupon, treatment, stage)
+
+def _capture(run, record, slug, folder, check_line, rotations):
+    if record.get("pieces_total"):
+        remember_pieces(output_root(), record["sample_id"], piece_names(record))
     now = datetime.datetime.now()
     date, session_time = now.strftime("%Y-%m-%d"), now.strftime("%H%M%S")
-    case_dir = output_root() / date / f"{slug}_{session_time}"
+    case_dir = output_root() / date / f"{folder}_{session_time}"
 
     run.print(f"{PREFIX} case_slug   : {slug}")
+    for line in check_line.splitlines():
+        run.print(f"{PREFIX} specimen    : {line}")
     run.print(f"{PREFIX} case_dir    : {case_dir}")
-    run.print(f"{PREFIX} rotations   : {' '.join(map(str, ROTATIONS))}")
+    run.print(f"{PREFIX} rotations   : {' '.join(map(str, rotations))}")
     run.print(f"{PREFIX} reps each   : {REPS_PER_ROTATION}")
-    run.print(f"{PREFIX} total frames: {REPS_PER_ROTATION * len(ROTATIONS)}")
+    run.print(f"{PREFIX} total frames: {REPS_PER_ROTATION * len(rotations)}")
     run.print("")
     case_dir.mkdir(parents=True, exist_ok=True)
 
-    for rotation in ROTATIONS:
+    for rotation in rotations:
         rotation_dir = case_dir / f"rot_{rotation}deg"
         rotation_dir.mkdir(exist_ok=True)
-        if rotation != ROTATIONS[0]:
+        if rotation != rotations[0]:
             run.print("")
             run.print(f"{PREFIX} " + "=" * 60)
             run.print(f"{PREFIX}   PAUSE  ── rotate the specimen 180° (in-plane), keep the ")
@@ -62,7 +78,7 @@ def capture_case(run, args):
             capture_frame(run, rotation_dir, label)
 
     manifest = case_dir / "case_manifest.json"
-    write_manifest(manifest, case_dir, slug, test, coupon, treatment, stage, date, session_time)
+    write_manifest(manifest, case_dir, slug, record, check_line, rotations, date, session_time)
     run.print(f"{PREFIX} manifest    : {manifest}")
     run.print("")
     run.print(f"{PREFIX} " + "=" * 60)
@@ -108,9 +124,9 @@ def capture_frame(run, folder, label):
         log("=" * 57)
 
 
-def write_manifest(manifest, case_dir, slug, test, coupon, treatment, stage, date, session_time):
+def write_manifest(manifest, case_dir, slug, record, check_line, rotations, date, session_time):
     frames = []
-    for rotation in ROTATIONS:
+    for rotation in rotations:
         rotation_dir = case_dir / f"rot_{rotation}deg"
         if not rotation_dir.is_dir():
             continue
@@ -118,18 +134,17 @@ def write_manifest(manifest, case_dir, slug, test, coupon, treatment, stage, dat
         for path in raw_files:
             frames.append({
                 "rotation_deg": rotation,
+                "rep": int(re.search(r"_r(\d+)$", path.stem).group(1)),
                 "basename": path.stem,
                 "cr3": path.relative_to(case_dir).as_posix(),
             })
     payload = {
         "case_slug": slug,
-        "test": test,
-        "coupon": coupon,
-        "treatment": treatment,
-        "stage": stage,
+        "summary": check_line,
+        **record,
         "date": date,
         "session_start_local": session_time,
-        "rotations_deg": ROTATIONS,
+        "rotations_deg": rotations,
         "reps_per_rotation": REPS_PER_ROTATION,
         "background": "BWblue",
         "frames": frames,

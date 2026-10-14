@@ -13,9 +13,9 @@ class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title(f"NexGenPPT Camera Control {__version__}")
-        # The tallest page (One specimen, paused for the rotation) needs 1024x776.
-        self.geometry("1100x800")
-        self.minsize(1024, 780)
+        # Sized for the Specimen photos page: its form needs the width, the rotation pause the height.
+        self.geometry("1180x800")
+        self.minsize(1100, 790)
 
         # Kept for the whole session, so leaving the camera page doesn't lose it.
         self.camera_check = None
