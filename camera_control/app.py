@@ -61,9 +61,38 @@ class App(ctk.CTk):
         # The app's own icon for the window and the taskbar or Dock, instead of Python's.
         if sys.platform == "win32":
             self.iconbitmap(str(ASSETS / "icon.ico"))
+            self.after(300, self._sharpen_windows_icon)
         else:
             self.icon = tkinter.PhotoImage(file=str(ASSETS / "icon.png"))   # kept, or Tk drops the image
             self.iconphoto(True, self.icon)
+
+    def _sharpen_windows_icon(self):
+        # Tk hands Windows only its 32 px icon, which the taskbar stretches (and blurs) on screens
+        # scaled above 100%. Give the window the sizes this screen uses, straight from the .ico.
+        import ctypes
+        from ctypes import wintypes
+        WM_SETICON, ICON_SMALL, ICON_BIG = 0x0080, 0, 1
+        IMAGE_ICON, LR_LOADFROMFILE, SM_CXICON, SM_CXSMICON = 1, 0x0010, 11, 49
+        user32 = ctypes.windll.user32
+        user32.LoadImageW.restype = wintypes.HANDLE
+        user32.LoadImageW.argtypes = [
+            wintypes.HINSTANCE, wintypes.LPCWSTR, wintypes.UINT, ctypes.c_int, ctypes.c_int, wintypes.UINT,
+        ]
+        user32.SendMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        try:
+            window = int(self.wm_frame(), 16)
+            try:
+                dpi = user32.GetDpiForWindow(wintypes.HWND(window))
+                size_of = lambda metric: user32.GetSystemMetricsForDpi(metric, dpi)
+            except AttributeError:   # Windows older than 10 has no per-screen sizes
+                size_of = user32.GetSystemMetrics
+            for which, metric in ((ICON_BIG, SM_CXICON), (ICON_SMALL, SM_CXSMICON)):
+                size = size_of(metric)
+                icon = user32.LoadImageW(None, str(ASSETS / "icon.ico"), IMAGE_ICON, size, size, LR_LOADFROMFILE)
+                if icon:
+                    user32.SendMessageW(window, WM_SETICON, which, icon)
+        except (OSError, ValueError):
+            pass   # the icon Tk set stays; only its sharpness is lost
 
     def bring_to_front(self):
         # Opens in front of other windows, then behaves normally.
