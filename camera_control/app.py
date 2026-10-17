@@ -1,5 +1,9 @@
 # Main window: sidebar on the left, the selected page on the right.
 
+import sys
+import tkinter
+from pathlib import Path
+
 import customtkinter as ctk
 from camera_control import __version__, theme
 from camera_control.camera_setup import CameraSetupPage
@@ -9,12 +13,14 @@ from camera_control.system import open_in_file_browser
 from camera_control.workflows import WORKFLOWS
 
 CAMERA_SETUP = "camera_setup"
+ASSETS = Path(__file__).resolve().parent / "assets"
 
 
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title(f"NexGenPPT Camera Control {__version__}")
+        self._set_icon()
         # Sized for the Specimen photos page: its form needs the width, the rotation pause the height.
         self.geometry("1180x800")
         self.minsize(1100, 790)
@@ -50,6 +56,14 @@ class App(ctk.CTk):
         self.sidebar.show_today(todays_captures(), todays_folder())
         self.select(CAMERA_SETUP)
         self.after(100, self.bring_to_front)
+
+    def _set_icon(self):
+        # The app's own icon for the window and the taskbar or Dock, instead of Python's.
+        if sys.platform == "win32":
+            self.iconbitmap(str(ASSETS / "icon.ico"))
+        else:
+            self.icon = tkinter.PhotoImage(file=str(ASSETS / "icon.png"))   # kept, or Tk drops the image
+            self.iconphoto(True, self.icon)
 
     def bring_to_front(self):
         # Opens in front of other windows, then behaves normally.
@@ -114,5 +128,9 @@ class App(ctk.CTk):
 
 
 def main():
+    if sys.platform == "win32":
+        # Groups the window under its own taskbar button and icon, not Python's.
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("NexGenPPT.CameraControl")
     theme.apply_theme()
     App().mainloop()

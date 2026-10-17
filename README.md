@@ -70,7 +70,8 @@ To make a desktop shortcut:
 
 1. In File Explorer, right-click `NexGenPPT Camera Control.bat` and choose **Show more options → Send to → Desktop (create shortcut)**.
 2. Right-click the new shortcut, choose **Properties**, and set **Run** to **Minimized**, so the update window stays out of the way. Click **OK**.
-3. Rename the shortcut to `NexGenPPT Camera Control`.
+3. On the same **Properties** window, click **Change Icon…**, then **Browse…**, and pick `camera_control\assets\icon.ico` in this folder. Click **OK** twice.
+4. Rename the shortcut to `NexGenPPT Camera Control`.
 
 ## How the camera is controlled
 
