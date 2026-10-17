@@ -2,7 +2,7 @@
 
 Desktop app for photographing fabric specimens with a Canon EOS RP over USB. It runs on macOS and Windows.
 
-The app checks the camera and applies the session profile. It then takes 4 photos of one specimen alone on the paper, either a whole parent or one cut piece: 2 at 0°, and 2 more after you rotate it 180°. Photos are saved to `data/raw/camera_sessions/<date>/`, along with a log for each photo and a `case_manifest.json`.
+The app checks the camera and applies the session profile. It then takes 4 photos of one specimen alone on the paper, either a whole parent or one cut piece: 2 at 0°, and 2 more after you rotate it 180°. Photos are saved to `Documents/NexGenPPT Camera Control/<date>/`, along with a log for each photo and a `case_manifest.json`.
 
 ## What you fill in
 
@@ -53,7 +53,7 @@ Keep digiCamControl open while you use the app. On both systems, quit EOS Utilit
 .venv\Scripts\python -m camera_control      # Windows
 ```
 
-Photos are saved inside this folder by default. To save them somewhere else, set `CAMERA_OUTPUT_ROOT` to a folder path before you start the app.
+Photos are saved in `NexGenPPT Camera Control` inside your Documents folder. To save them somewhere else, set `CAMERA_OUTPUT_ROOT` to a folder path before you start the app.
 
 ## How the camera is controlled
 

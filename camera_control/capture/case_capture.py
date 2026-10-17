@@ -10,7 +10,7 @@ from camera_control.capture.cameras import CameraError, camera_for_this_computer
 from camera_control.capture.specimen import (
     InvalidSpecimen, check_specimen, folder_name, piece_names, remember_pieces, specimen_name, summary,
 )
-from camera_control.system import PROJECT_ROOT
+from camera_control.system import APP_FOLDER, documents_folder
 
 ROTATIONS = [0, 180]
 REPS_PER_ROTATION = 2
@@ -18,7 +18,8 @@ PREFIX = "[acquire_case]"
 
 
 def output_root():
-    return Path(os.environ.get("CAMERA_OUTPUT_ROOT") or PROJECT_ROOT / "data" / "raw" / "camera_sessions")
+    # Photos are saved in Documents/NexGenPPT Camera Control unless CAMERA_OUTPUT_ROOT names another folder.
+    return Path(os.environ.get("CAMERA_OUTPUT_ROOT") or documents_folder() / APP_FOLDER)
 
 
 def todays_folder():

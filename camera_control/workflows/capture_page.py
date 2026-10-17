@@ -9,13 +9,13 @@
 #   read_output    move the steps along as the job prints its progress
 #   build_guide    optional: replace the numbered step list (see guide_title)
 
-import datetime
 import re
 
 import customtkinter as ctk
 from camera_control import theme
 from camera_control.capture import start_run
-from camera_control.system import open_in_file_browser
+from camera_control.capture.case_capture import todays_folder
+from camera_control.system import open_in_file_browser, shown_path
 from camera_control.widgets import StepList, secondary_button, section_label
 
 
@@ -136,7 +136,7 @@ class CapturePage(ctk.CTkFrame):
             self.output_label.configure(text=result[1], text_color=theme.TEXT)
             self.summary_title.configure(text="CHECK BEFORE TAKING PHOTOS")
             self.summary_label.configure(text=result[2])
-            self.folder_label.configure(text=f"in data/raw/camera_sessions/{datetime.date.today()}/")
+            self.folder_label.configure(text=f"in {shown_path(todays_folder())}/")
         self._update_main_button()
 
     def _update_main_button(self):
