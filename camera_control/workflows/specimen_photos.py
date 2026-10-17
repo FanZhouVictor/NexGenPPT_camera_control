@@ -15,7 +15,7 @@ from camera_control.capture.specimen import (
     check_specimen, default_piece_names, duration, folder_name, known_pieces, summary,
 )
 from camera_control.placement_guide import PlacementGuide
-from camera_control.widgets import choice_buttons, form_row, row_entry, row_menu, row_text
+from camera_control.widgets import TypedChoice, choice_buttons, form_row, row_entry, row_menu, row_text
 from camera_control.workflows.capture_page import CapturePage
 
 OBJECTS = {"Parent": "parent", "Pieces": "piece", "Other": "other"}
@@ -120,14 +120,8 @@ class SpecimenPhotosPage(CapturePage):
         return entry, menu
 
     def _typed_choice(self, row, values):
-        # A list to pick from that also accepts typed text.
-        box = ctk.CTkComboBox(
-            row, values=values, height=28, font=theme.font(13), dropdown_font=theme.font(13),
-            command=lambda _: self.refresh(),
-        )
-        box.set("")
+        box = TypedChoice(row, values, "Type here or select", self.refresh)
         box.pack(side="left", fill="x", expand=True)
-        box.bind("<KeyRelease>", lambda _: self.refresh())
         return box
 
     def build_guide(self, parent):

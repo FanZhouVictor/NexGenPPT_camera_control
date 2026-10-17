@@ -54,6 +54,55 @@ def row_text(row, text):
     ctk.CTkLabel(row, text=text, font=theme.font(13), text_color=theme.TEXT_MUTED).pack(side="left", padx=6)
 
 
+class TypedChoice(ctk.CTkComboBox):
+    # A list to pick from that also accepts typed text. While it is empty it shows a grey hint.
+
+    def __init__(self, master, values, hint, on_change):
+        super().__init__(
+            master, values=values, height=28, font=theme.font(13), dropdown_font=theme.font(13),
+            command=lambda _: on_change(),
+        )
+        self.hint, self.hinting = hint, False
+        self.bind("<KeyRelease>", lambda _: on_change())
+        self.bind("<FocusIn>", lambda _: self._show_hint(False))
+        self.bind("<FocusOut>", lambda _: self._show_hint(not self.get()))
+        self.set("")
+
+    def get(self):
+        return "" if self.hinting else super().get()
+
+    def set(self, value):
+        self.hinting = False
+        super().set(value)
+        self._show_hint(not value and not self._has_focus())
+
+    def _has_focus(self):
+        try:
+            return self.focus_get() is self._entry
+        except KeyError:   # Tk can't name the open dropdown menu
+            return False
+
+    def _dropdown_callback(self, value):
+        self._show_hint(False)
+        super()._dropdown_callback(value)
+
+    def _show_hint(self, show):
+        if show != self.hinting:
+            super().set(self.hint if show else "")
+            self.hinting = show
+        self._colour_text()
+
+    def _draw(self, no_color_updates=False):
+        super()._draw(no_color_updates)
+        self._colour_text()
+
+    def _colour_text(self):
+        if getattr(self, "hinting", False):
+            self._entry.configure(fg=theme.TEXT_MUTED)
+        else:
+            self._entry.configure(fg=self._apply_appearance_mode(self._text_color))
+
+
 def secondary_button(parent, text, command, **options):
     return ctk.CTkButton(
         parent, text=text, command=command, font=theme.font(options.pop("size", 13), bold=True),
