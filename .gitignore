@@ -22,3 +22,6 @@ __pycache__/
 *.pyc
 build/
 dist/
+
+# Written by the Windows launcher when the app can't start
+launch_error.log

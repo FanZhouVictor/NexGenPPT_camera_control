@@ -57,7 +57,7 @@ Photos are saved in `NexGenPPT Camera Control` inside your Documents folder. To 
 
 ## Lab PC
 
-On the lab's Windows PC, open the app with `NexGenPPT Camera Control.bat` in this folder. Each time it runs, it first downloads the latest version with `git pull` and installs any new libraries, then opens the app. Without internet it skips the update and opens the current version.
+On the lab's Windows PC, open the app with `NexGenPPT Camera Control.pyw` in this folder. It opens without a console window. Each time, it first downloads the latest version with `git pull` and installs any new libraries, then opens the app. Without internet it skips the update and opens the current version. If the app can't start, it shows a message and writes the details to `launch_error.log`.
 
 The lab PC should follow the `main` branch, so only versions that are ready reach it. Work happens on `dev` and is merged into `main` when it is ready. To switch the lab PC to `main` once:
 
@@ -68,10 +68,9 @@ git pull
 
 To make a desktop shortcut:
 
-1. In File Explorer, right-click `NexGenPPT Camera Control.bat` and choose **Show more options → Send to → Desktop (create shortcut)**.
-2. Right-click the new shortcut, choose **Properties**, and set **Run** to **Minimized**, so the update window stays out of the way. Click **OK**.
-3. On the same **Properties** window, click **Change Icon…**, then **Browse…**, and pick `camera_control\assets\icon.ico` in this folder. Click **OK** twice.
-4. Rename the shortcut to `NexGenPPT Camera Control`.
+1. In File Explorer, right-click `NexGenPPT Camera Control.pyw` and choose **Show more options → Send to → Desktop (create shortcut)**.
+2. Right-click the new shortcut, choose **Properties**, click **Change Icon…**, then **Browse…**, and pick `camera_control\assets\icon.ico` in this folder. Click **OK** twice.
+3. Rename the shortcut to `NexGenPPT Camera Control`.
 
 ## How the camera is controlled
 
