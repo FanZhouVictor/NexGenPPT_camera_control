@@ -35,14 +35,27 @@ python3 -m venv .venv
 
 **Windows**
 
-1. Install [digiCamControl](https://digicamcontrol.com) (tested with 2.1.6).
-2. In digiCamControl, set transfer to **Save to PC only**.
-3. Install the app's packages:
+1. Install these:
+   - [Python](https://www.python.org/downloads/) 3.12. In the installer, tick **Add python.exe to PATH**.
+   - [Git for Windows](https://git-scm.com/download/win).
+   - [digiCamControl](https://digicamcontrol.com) (tested with 2.1.6). In digiCamControl, set transfer to **Save to PC only**.
+2. On the camera itself, set these once: Adobe RGB colour space, Picture Style Neutral, spot metering, 2-second self-timer, Auto Lighting Optimizer off, white balance shift 0,0, and auto power off disabled. digiCamControl can't set them, and the camera keeps them until someone changes them.
+3. Open Command Prompt, then download the app and install its packages:
 
-```bat
-py -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-```
+   ```bat
+   cd %USERPROFILE%
+   git clone -b main https://github.com/FanZhouVictor/NexGenPPT_camera_control.git
+   cd NexGenPPT_camera_control
+   py -m venv .venv
+   .venv\Scripts\pip install -r requirements.txt
+   ```
+
+4. Make a desktop shortcut:
+   1. In File Explorer, open the `NexGenPPT_camera_control` folder in your user folder. Right-click `NexGenPPT Camera Control.pyw` and choose **Show more options → Send to → Desktop (create shortcut)**.
+   2. Right-click the new shortcut, choose **Properties**, click **Change Icon…**, then **Browse…**, and pick `camera_control\assets\icon.ico` in the same folder. Click **OK** twice.
+   3. Rename the shortcut to `NexGenPPT Camera Control`.
+
+Open the app with the shortcut. Each time, it first gets the latest version from the `main` branch and installs any new packages, then opens the app, with no console window. Without internet it skips the update. If the app can't start, it shows a message and writes the details to `launch_error.log` in the app's folder.
 
 Keep digiCamControl open while you use the app. On both systems, quit EOS Utility first, because only one program can use the camera at a time.
 
@@ -50,27 +63,10 @@ Keep digiCamControl open while you use the app. On both systems, quit EOS Utilit
 
 ```bash
 .venv/bin/python -m camera_control          # macOS
-.venv\Scripts\python -m camera_control      # Windows
+.venv\Scripts\python -m camera_control      # Windows, without the update step
 ```
 
 Photos are saved in `NexGenPPT Camera Control` inside your Documents folder. To save them somewhere else, set `CAMERA_OUTPUT_ROOT` to a folder path before you start the app.
-
-## Lab PC
-
-On the lab's Windows PC, open the app with `NexGenPPT Camera Control.pyw` in this folder. It opens without a console window. Each time, it first downloads the latest version with `git pull` and installs any new libraries, then opens the app. Without internet it skips the update and opens the current version. If the app can't start, it shows a message and writes the details to `launch_error.log`.
-
-The lab PC should follow the `main` branch, so only versions that are ready reach it. Work happens on `dev` and is merged into `main` when it is ready. To switch the lab PC to `main` once:
-
-```bat
-git switch main
-git pull
-```
-
-To make a desktop shortcut:
-
-1. In File Explorer, right-click `NexGenPPT Camera Control.pyw` and choose **Show more options → Send to → Desktop (create shortcut)**.
-2. Right-click the new shortcut, choose **Properties**, click **Change Icon…**, then **Browse…**, and pick `camera_control\assets\icon.ico` in this folder. Click **OK** twice.
-3. Rename the shortcut to `NexGenPPT Camera Control`.
 
 ## How the camera is controlled
 

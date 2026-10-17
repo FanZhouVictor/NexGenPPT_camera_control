@@ -10,7 +10,7 @@ from camera_control.diagnostics import DiagnosticsWindow
 from camera_control.widgets import StatusRow, secondary_button, section_label
 
 SETUP_STEPS = [
-    "Turn on the light box and wait 20 minutes.",
+    "Turn on the light box and wait 5 minutes.",
     "Turn the camera dial to M.",
     "Set the lens focus switch to MF.",
     "Set the lens stabilizer switch to OFF.",
@@ -81,12 +81,12 @@ class CameraSetupPage(ctk.CTkFrame):
 
     def _step_line(self, parent, number, text):
         row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(fill="x", pady=3)
+        row.pack(fill="x", pady=2)
         ctk.CTkLabel(
             row, text=f"{number}.", width=26, font=theme.font(14, bold=True), text_color=theme.PRIMARY, anchor="e",
         ).pack(side="left", anchor="n")
         ctk.CTkLabel(
-            row, text=text, font=theme.font(14), anchor="w", justify="left", wraplength=320,
+            row, text=text, font=theme.font(14), anchor="w", justify="left", wraplength=380,
         ).pack(side="left", padx=(8, 0))
 
     def _set_status(self, text, color=None):
