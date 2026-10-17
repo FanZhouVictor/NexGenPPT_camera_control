@@ -3,6 +3,7 @@
 #
 #   python -m unittest discover tests
 
+import datetime
 import json
 import os
 import re
@@ -16,7 +17,7 @@ from unittest import mock
 
 from camera_control.camera_check import CameraCheck
 from camera_control.capture.cameras import CameraError, DigiCamControlCamera, Gphoto2Camera
-from camera_control.capture.case_capture import capture_case
+from camera_control.capture.case_capture import capture_case, todays_captures
 from camera_control.capture.preflight import run_preflight
 from camera_control.capture.run import CaptureRun
 from camera_control.capture.specimen import (
@@ -218,6 +219,18 @@ class Gphoto2Capture(FakeToolTest):
         self.assertEqual({key: manifest[key] for key in PIECE}, PIECE)
         self.assertEqual(known_pieces(self.tmp / "out", "C205"), ["P1", "P2", "P3", "P4"])
         self.assertIsNone(known_pieces(self.tmp / "out", "C187"))
+
+    def test_todays_captures_lists_finished_captures_newest_first(self):
+        self.assertEqual(todays_captures(), [])
+        run_job(capture_case, PARENT)
+        time.sleep(1.1)   # folder names carry the time to the second
+        run_job(capture_case, PIECE)
+        unfinished = self.tmp / "out" / datetime.date.today().strftime("%Y-%m-%d") / "C999_parent_clean_235959"
+        unfinished.mkdir()   # a cancelled capture has photos but no manifest
+        captures = todays_captures()
+        self.assertEqual([name for _, name, _ in captures], ["C205_P2", "C187_parent"])
+        self.assertRegex(captures[0][0], r"^\d\d:\d\d$")
+        self.assertTrue((captures[0][2] / "case_manifest.json").exists())
 
     def test_incomplete_answers_stop_the_capture(self):
         exit_code, lines = run_job(capture_case, {**PARENT, "aged": None})

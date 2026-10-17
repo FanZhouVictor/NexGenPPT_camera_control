@@ -3,7 +3,9 @@
 import customtkinter as ctk
 from camera_control import __version__, theme
 from camera_control.camera_setup import CameraSetupPage
+from camera_control.capture.case_capture import todays_captures, todays_folder
 from camera_control.sidebar import Sidebar
+from camera_control.system import open_in_file_browser
 from camera_control.workflows import WORKFLOWS
 
 CAMERA_SETUP = "camera_setup"
@@ -22,6 +24,7 @@ class App(ctk.CTk):
 
         self.sidebar = Sidebar(
             self, [(w.key, w.label) for w in WORKFLOWS], self.select, lambda: self.select(CAMERA_SETUP),
+            open_in_file_browser,
         )
         self.sidebar.pack(side="left", fill="y")
 
@@ -44,6 +47,7 @@ class App(ctk.CTk):
 
         self.page = None
         self.protocol("WM_DELETE_WINDOW", self.close)
+        self.sidebar.show_today(todays_captures(), todays_folder())
         self.select(CAMERA_SETUP)
         self.after(100, self.bring_to_front)
 
@@ -62,14 +66,14 @@ class App(ctk.CTk):
         if key == CAMERA_SETUP:
             self._set_heading("Camera setup", "Do this at the start of every session, before taking photos.")
             self.page = CameraSetupPage(
-                self.page_card, self.action_bar, self.sidebar.lock,
+                self.page_card, self.action_bar, self.set_busy,
                 self.camera_check, self.camera_checked, lambda: self.select(WORKFLOWS[0].key),
             )
         else:
             workflow = next(w for w in WORKFLOWS if w.key == key)
             self._set_heading(workflow.label, workflow.description)
             if workflow.page:
-                self.page = workflow.page(self.page_card, self.action_bar, self.sidebar.lock, self.camera_ready())
+                self.page = workflow.page(self.page_card, self.action_bar, self.set_busy, self.camera_ready())
             else:
                 self._show_placeholder(workflow.label)
                 return
@@ -89,6 +93,12 @@ class App(ctk.CTk):
             self.action_bar, text="Take photos", height=56, width=220, font=theme.font(18, bold=True),
             state="disabled",
         ).pack(side="right")
+
+    def set_busy(self, busy):
+        # Pages call this while the camera is working. Afterwards a capture may have been saved.
+        self.sidebar.lock(busy)
+        if not busy:
+            self.sidebar.show_today(todays_captures(), todays_folder())
 
     def camera_checked(self, check):
         self.camera_check = check

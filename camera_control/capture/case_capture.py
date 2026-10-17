@@ -21,6 +21,28 @@ def output_root():
     return Path(os.environ.get("CAMERA_OUTPUT_ROOT") or PROJECT_ROOT / "data" / "raw" / "camera_sessions")
 
 
+def todays_folder():
+    return output_root() / datetime.date.today().strftime("%Y-%m-%d")
+
+
+def todays_captures():
+    # Captures finished today (they have a case_manifest.json), newest first,
+    # as ("13:59", "C205_P2", the capture's folder).
+    folder = todays_folder()
+    captures = []
+    for manifest in folder.glob("*/case_manifest.json"):
+        try:
+            data = json.loads(manifest.read_text())
+        except (OSError, ValueError):
+            continue
+        started = str(data.get("session_start_local", ""))
+        captures.append((started, data.get("case_slug") or manifest.parent.name, manifest.parent))
+    return [
+        (f"{started[:2]}:{started[2:4]}", name, folder)
+        for started, name, folder in sorted(captures, key=lambda capture: capture[0], reverse=True)
+    ]
+
+
 def capture_case(run, specimen):
     # specimen: the answers from the specimen form (see specimen.py).
     try:
