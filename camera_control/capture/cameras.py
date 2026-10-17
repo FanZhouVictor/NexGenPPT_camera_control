@@ -138,6 +138,9 @@ class DigiCamControlCamera(Camera):
         "/main/capturesettings/exposurecompensation": ("exposurecompensation", "0.0"),
     }
     DOWNLOAD_TIMEOUT = 60
+    # digiCamControl can keep a photo open for a moment after it has arrived, and Windows won't
+    # move or delete a file another program has open, so those are retried for this long.
+    FILE_RELEASE_TIMEOUT = 15
 
     def tool_path(self):
         return next(
@@ -210,7 +213,7 @@ class DigiCamControlCamera(Camera):
         staging = base.parent / "_incoming"
         staging.mkdir(exist_ok=True)
         for leftover in staging.iterdir():
-            leftover.unlink()
+            self._when_released(leftover, leftover.unlink)
         self.command("set", "session.folder", str(staging))
         self.command("capture")
 
@@ -218,11 +221,30 @@ class DigiCamControlCamera(Camera):
         saved = []
         for photo in arrived:
             target = base.with_name(base.name + photo.suffix.upper())
-            shutil.move(str(photo), str(target))
+            self._when_released(photo, lambda: shutil.move(str(photo), str(target)))
             self.log(f"Saving file as {target}", stamp=False)
             saved.append(target)
-        staging.rmdir()
+        try:
+            staging.rmdir()
+        except OSError:
+            pass   # digiCamControl still has the folder open; it is emptied before the next photo
         return sorted(saved)
+
+    def _when_released(self, photo, action):
+        # Runs action (moving or deleting photo), waiting while another program still has it open.
+        started = time.monotonic()
+        while True:
+            try:
+                return action()
+            except PermissionError:
+                if time.monotonic() - started > self.FILE_RELEASE_TIMEOUT:
+                    raise CameraError(
+                        f"{photo.name} is still open in another program after {self.FILE_RELEASE_TIMEOUT} s. "
+                        "Close any program showing the photo (such as a viewer or Explorer preview) and try again."
+                    )
+                if self.stop_event.is_set():
+                    raise Stopped()
+                time.sleep(0.25)
 
     def _wait_for_photos(self, folder):
         # Done when a raw file has arrived and nothing has changed for 2 seconds.

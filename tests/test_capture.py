@@ -232,6 +232,12 @@ class Gphoto2Capture(FakeToolTest):
         self.assertRegex(captures[0][0], r"^\d\d:\d\d$")
         self.assertTrue((captures[0][2] / "case_manifest.json").exists())
 
+    def test_photos_go_to_documents_unless_told_otherwise(self):
+        from camera_control.capture.case_capture import output_root
+        self.assertEqual(output_root(), self.tmp / "out")
+        del os.environ["CAMERA_OUTPUT_ROOT"]
+        self.assertEqual(output_root(), Path.home() / "Documents" / "NexGenPPT Camera Control")
+
     def test_incomplete_answers_stop_the_capture(self):
         exit_code, lines = run_job(capture_case, {**PARENT, "aged": None})
         self.assertEqual(exit_code, 1)
@@ -282,6 +288,27 @@ class DigiCamControlCapture(FakeToolTest):
     def test_case_capture_names_files_like_the_mac(self):
         self.assert_case_saved()
         self.assertEqual(list((self.tmp / "out").rglob("_incoming")), [])
+
+    def test_photos_still_open_in_digicamcontrol_are_moved_once_released(self):
+        # Windows refuses to move a file another program has open, as digiCamControl briefly does.
+        real_move, refusals = shutil.move, []
+        def busy_at_first(source, target):
+            if len(refusals) < 3:
+                refusals.append(source)
+                raise PermissionError(32, "The process cannot access the file because it is being used by another process")
+            return real_move(source, target)
+        with mock.patch("camera_control.capture.cameras.shutil.move", busy_at_first):
+            self.assert_case_saved()
+        self.assertEqual(len(refusals), 3)
+
+    def test_photo_that_stays_open_is_a_clear_error(self):
+        def always_busy(source, target):
+            raise PermissionError(32, "The process cannot access the file because it is being used by another process")
+        with mock.patch("camera_control.capture.cameras.shutil.move", always_busy), \
+                mock.patch.object(DigiCamControlCamera, "FILE_RELEASE_TIMEOUT", 1):
+            exit_code, lines = run_job(capture_case, PARENT)
+        self.assertEqual(exit_code, 1)
+        self.assertIn("still open in another program", lines[-1])
 
     def test_photo_without_raw_file_is_an_error(self):
         os.environ["FAKE_DCC"] = "jpegonly"
