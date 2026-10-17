@@ -55,6 +55,23 @@ Keep digiCamControl open while you use the app. On both systems, quit EOS Utilit
 
 Photos are saved in `NexGenPPT Camera Control` inside your Documents folder. To save them somewhere else, set `CAMERA_OUTPUT_ROOT` to a folder path before you start the app.
 
+## Lab PC
+
+On the lab's Windows PC, open the app with `NexGenPPT Camera Control.bat` in this folder. Each time it runs, it first downloads the latest version with `git pull` and installs any new libraries, then opens the app. Without internet it skips the update and opens the current version.
+
+The lab PC should follow the `main` branch, so only versions that are ready reach it. Work happens on `dev` and is merged into `main` when it is ready. To switch the lab PC to `main` once:
+
+```bat
+git switch main
+git pull
+```
+
+To make a desktop shortcut:
+
+1. In File Explorer, right-click `NexGenPPT Camera Control.bat` and choose **Show more options → Send to → Desktop (create shortcut)**.
+2. Right-click the new shortcut, choose **Properties**, and set **Run** to **Minimized**, so the update window stays out of the way. Click **OK**.
+3. Rename the shortcut to `NexGenPPT Camera Control`.
+
 ## How the camera is controlled
 
 | | macOS | Windows |
