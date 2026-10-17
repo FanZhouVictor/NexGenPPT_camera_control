@@ -6,6 +6,9 @@ import sys
 from pathlib import Path
 
 APP_FOLDER = "NexGenPPT Camera Control"
+# The app runs without a console on Windows, where each command-line tool it starts would otherwise
+# open a console window of its own.
+NO_WINDOW = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
 # Where Homebrew installs gphoto2. Apps opened from Finder or the Dock don't get these on PATH.
 TOOL_DIRS = ["/opt/homebrew/bin", "/usr/local/bin"]
 

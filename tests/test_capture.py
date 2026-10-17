@@ -25,6 +25,8 @@ from camera_control.capture.specimen import (
 )
 
 FAKES = Path(__file__).resolve().parent / "fakes"
+# The real method, before the digiCamControl tests replace it with a stand-in.
+LIST_RUNNING_PROGRAMS = DigiCamControlCamera.running_programs
 TIMESTAMP = re.compile(r"\d{4}-\d{2}-\d{2}-\d{6}")
 PARENT = {
     "sample_id": "C187", "object": "parent", "piece": None, "pieces_total": None, "description": None,
@@ -309,6 +311,20 @@ class DigiCamControlCapture(FakeToolTest):
             exit_code, lines = run_job(capture_case, PARENT)
         self.assertEqual(exit_code, 1)
         self.assertIn("still open in another program", lines[-1])
+
+    def test_tools_run_without_a_console_window(self):
+        # Started from the windowless launcher, each tool would otherwise open a console on Windows.
+        windowless = 0x08000000
+        with mock.patch("camera_control.capture.cameras.NO_WINDOW", windowless), \
+                mock.patch("camera_control.capture.cameras.subprocess.Popen") as popen, \
+                mock.patch("camera_control.capture.cameras.subprocess.run") as run:
+            popen.return_value.communicate.return_value = (':;response:"100";', None)
+            popen.return_value.returncode = 0
+            camera = DigiCamControlCamera(threading.Event())
+            camera.command("get", "iso")
+            LIST_RUNNING_PROGRAMS(camera)
+        self.assertEqual(popen.call_args.kwargs["creationflags"], windowless)
+        self.assertEqual(run.call_args.kwargs["creationflags"], windowless)
 
     def test_photo_without_raw_file_is_an_error(self):
         os.environ["FAKE_DCC"] = "jpegonly"

@@ -16,7 +16,7 @@ import sys
 import time
 from pathlib import Path
 
-from camera_control.system import tool_environment
+from camera_control.system import NO_WINDOW, tool_environment
 
 CAMERA_MODEL = "Canon EOS RP"
 
@@ -42,6 +42,7 @@ class Camera:
         # Runs a command, but gives up as soon as the capture is cancelled.
         process = subprocess.Popen(
             command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=tool_environment(),
+            creationflags=NO_WINDOW,
         )
         started = time.monotonic()
         while True:
@@ -149,7 +150,7 @@ class DigiCamControlCamera(Camera):
         )
 
     def running_programs(self):
-        return subprocess.run(["tasklist"], capture_output=True, text=True).stdout
+        return subprocess.run(["tasklist"], capture_output=True, text=True, creationflags=NO_WINDOW).stdout
 
     def check_tools(self):
         if not self.tool_path():
