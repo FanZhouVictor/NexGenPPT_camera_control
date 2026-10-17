@@ -2,20 +2,14 @@
 
 Desktop app for photographing fabric specimens with a Canon EOS RP over USB. It runs on macOS and Windows.
 
-The app checks the camera and applies the session profile. It then photographs what is on the paper:
-
-- **One specimen alone** (a whole parent or one cut piece): 4 photos, 2 at 0° and 2 more after you rotate it 180°.
-- **Several cut pieces together:** 2 photos at 0°, with no rotation.
-
-Photos are saved to `data/raw/camera_sessions/<date>/`, along with a log for each photo and a `case_manifest.json`.
+The app checks the camera and applies the session profile. It then takes 4 photos of one specimen alone on the paper, either a whole parent or one cut piece: 2 at 0°, and 2 more after you rotate it 180°. Photos are saved to `data/raw/camera_sessions/<date>/`, along with a log for each photo and a `case_manifest.json`.
 
 ## What you fill in
 
 Before each capture the app asks a few questions about the specimen. Any combination of answers is allowed.
 
 - **Sample ID** of the parent sample, such as `C205`.
-- **What you are photographing:** the whole parent, cut pieces, or something else. For pieces you enter how many the sample was cut into and tick the ones on the paper. The pieces are named `P1`, `P2`, … from left to right as cut; you can type your own names instead (letters and numbers, up to 8 characters). The app remembers the count and names for each sample.
-- **Several pieces ticked:** place them left to right in piece order, as the drawing shows. They start with one shared condition; pick a piece under "Condition of" to give it its own.
+- **What you are photographing:** the whole parent, one cut piece, or something else. For a piece you enter how many the sample was cut into and choose which piece is on the paper; only one piece is photographed at a time. The pieces are named `P1`, `P2`, … from left to right as cut; you can type your own names instead (letters and numbers, up to 8 characters). The app remembers the count and names for each sample; a new sample, or a new count, starts again from `P1`, `P2`, …
 - **Contamination:** before or after.
 - **Aged:** yes or no, and for how long.
 - **Washed:** yes or no, the wash condition, how long ago it ended, and whether the specimen is now wet, damp or dry. If it was both aged and washed, which came first.
@@ -23,9 +17,9 @@ Before each capture the app asks a few questions about the specimen. Any combina
 
 Times can be in minutes, hours or days, and decimals are fine. Leave a time empty if you don't know it; it is saved as `unknown`.
 
-Photos are named by sample and piece, for example `<time>-C205_P2_0deg_r01.CR3`, or `<time>-C205_P1-P2-P3-P4_0deg_r01.CR3` for several pieces. Each capture's folder also says the condition, for example `C205_P2_contam_aged7d_washed_<time>/` (`clean` or `contam`, then `aged` with its length, then `washed`). With several pieces the folder only says the condition when they all share it.
+Photos are named by sample and piece, for example `<time>-C205_P2_0deg_r01.CR3`. Each capture's folder also says the condition, for example `C205_P2_contam_aged7d_washed_<time>/` (`clean` or `contam`, then `aged` with its length, then `washed`).
 
-Every answer is saved in full in `case_manifest.json` next to the photos. For several pieces it lists each piece with its position on the paper (1 is the leftmost) and its own condition.
+Every answer is saved in full in `case_manifest.json` next to the photos.
 
 ## Setup
 

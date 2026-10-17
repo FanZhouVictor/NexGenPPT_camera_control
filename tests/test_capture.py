@@ -16,12 +16,11 @@ from unittest import mock
 
 from camera_control.camera_check import CameraCheck
 from camera_control.capture.cameras import CameraError, DigiCamControlCamera, Gphoto2Camera
-from camera_control.capture.case_capture import capture_batch, capture_case
+from camera_control.capture.case_capture import capture_case
 from camera_control.capture.preflight import run_preflight
 from camera_control.capture.run import CaptureRun
 from camera_control.capture.specimen import (
-    InvalidSpecimen, batch_folder_name, batch_name, batch_summary, check_batch, check_specimen, duration,
-    folder_name, known_pieces, specimen_name, summary,
+    InvalidSpecimen, check_specimen, duration, folder_name, known_pieces, specimen_name, summary,
 )
 
 FAKES = Path(__file__).resolve().parent / "fakes"
@@ -40,24 +39,6 @@ PIECE = {
     "washed": "yes", "wash_condition": "PER", "since_wash": {"value": 6.0, "unit": "hours"}, "wetness": "dry",
     "order": "aged_then_washed",
 }
-CLEAN = {key: PARENT[key] for key in (
-    "contamination", "aged", "aged_for", "washed", "wash_condition", "since_wash", "wetness", "order")}
-WASHED = {key: PIECE[key] for key in CLEAN}
-# Three of the four pieces in one picture, left to right; the last one has been aged and washed.
-BATCH = {
-    "sample_id": "C205", "object": "pieces", "pieces_total": 4, "notes": "",
-    "pieces": [
-        {"piece": "P1", "position": 1, **CLEAN},
-        {"piece": "P2", "position": 2, **CLEAN},
-        {"piece": "P4", "position": 3, **WASHED},
-    ],
-}
-
-
-def same_condition(batch, condition):
-    return {**batch, "pieces": [{**piece, **condition} for piece in batch["pieces"]]}
-
-
 def masked(text):
     return TIMESTAMP.sub("<time>", text)
 
@@ -131,47 +112,12 @@ class Specimens(unittest.TestCase):
             with self.subTest(change=change), self.assertRaisesRegex(InvalidSpecimen, problem):
                 check_specimen({**PARENT, **change})
 
-    def test_several_pieces_in_one_picture(self):
-        check_batch(BATCH)
-        self.assertEqual(batch_name(BATCH), "C205_P1-P2-P4")
-        self.assertEqual(batch_folder_name(BATCH), "C205_P1-P2-P4")   # conditions differ, so none in the name
-        self.assertEqual(batch_summary(BATCH).splitlines(), [
-            "C205 · P1, P2, P4 left to right",
-            "P1 · before contamination · not aged · not washed",
-            "P2 · before contamination · not aged · not washed",
-            "P4 · after contamination · aged 7 days · 6 hours after wash (PER) · dry · aged, then washed",
-        ])
-        alike = same_condition(BATCH, WASHED)
-        self.assertEqual(batch_folder_name(alike), "C205_P1-P2-P4_contam_aged7d_washed")
-        self.assertEqual(
-            batch_summary(alike),
-            "C205 · P1, P2, P4 left to right · all after contamination · aged 7 days · "
-            "6 hours after wash (PER) · dry · aged, then washed",
-        )
-
-    def test_problems_with_several_pieces(self):
-        pieces = BATCH["pieces"]
-        for change, problem in [
-            ({"sample_id": ""}, "sample ID"),
-            ({"pieces_total": None}, "how many pieces"),
-            ({"pieces": pieces[:1]}, "which pieces"),
-            ({"pieces": [pieces[0], pieces[0]]}, "only be on the paper once"),
-            ({"pieces": [pieces[0], {**pieces[1], "piece": "P9"}]}, "which piece"),
-            ({"pieces": [pieces[0], {**pieces[1], "washed": None}]}, "P2: Choose whether it was washed"),
-        ]:
-            with self.subTest(change=change), self.assertRaisesRegex(InvalidSpecimen, problem):
-                check_batch({**BATCH, **change})
-
     def test_pieces_can_be_renamed(self):
         names = ["L", "ML", "MR", "R"]
         renamed = {**PIECE, "piece": "ML", "piece_names": names}
         check_specimen(renamed)
         self.assertEqual(specimen_name(renamed), "C205_ML")
         self.assertEqual(summary(renamed).split(" · ")[1], "ML")
-        batch = {**BATCH, "piece_names": names, "pieces": [
-            {**BATCH["pieces"][0], "piece": "L"}, {**BATCH["pieces"][1], "piece": "R"}]}
-        check_batch(batch)
-        self.assertEqual(batch_name(batch), "C205_L-R")
         for change, problem in [
             ({"piece": "P2"}, "which piece"),                       # the old name is gone
             ({"piece_names": ["L", "ML", "MR"]}, "4 different piece names"),
@@ -272,28 +218,6 @@ class Gphoto2Capture(FakeToolTest):
         self.assertEqual({key: manifest[key] for key in PIECE}, PIECE)
         self.assertEqual(known_pieces(self.tmp / "out", "C205"), ["P1", "P2", "P3", "P4"])
         self.assertIsNone(known_pieces(self.tmp / "out", "C187"))
-
-    def test_several_pieces_get_two_photos_and_no_rotation(self):
-        exit_code, lines = run_job(capture_batch, BATCH)
-        self.assertEqual(exit_code, 0, lines[-3:])
-        self.assertFalse(any("PAUSE" in line for line in lines))
-        names = self.saved_names()
-        self.assertEqual(len(names), 8)   # 2 photos x (CR3, JPG, log) + manifest + samples.json
-        self.assertIn("<time>-C205_P1-P2-P4_0deg_r02.CR3", names)
-        manifest = json.loads(next((self.tmp / "out").rglob("case_manifest.json")).read_text())
-        self.assertEqual(manifest["pieces"], BATCH["pieces"])
-        self.assertEqual([(piece["piece"], piece["position"]) for piece in manifest["pieces"]],
-                         [("P1", 1), ("P2", 2), ("P4", 3)])
-        self.assertEqual(manifest["rotations_deg"], [0])
-        self.assertEqual([(frame["rotation_deg"], frame["rep"]) for frame in manifest["frames"]], [(0, 1), (0, 2)])
-        self.assertEqual(known_pieces(self.tmp / "out", "C205"), ["P1", "P2", "P3", "P4"])
-
-    def test_renamed_pieces_are_remembered_for_the_sample(self):
-        names = ["L", "ML", "MR", "R"]
-        exit_code, lines = run_job(capture_case, {**PIECE, "piece": "MR", "piece_names": names})
-        self.assertEqual(exit_code, 0, lines[-3:])
-        self.assertIn("<time>-C205_MR_0deg_r01.CR3", self.saved_names())
-        self.assertEqual(known_pieces(self.tmp / "out", "C205"), names)
 
     def test_incomplete_answers_stop_the_capture(self):
         exit_code, lines = run_job(capture_case, {**PARENT, "aged": None})

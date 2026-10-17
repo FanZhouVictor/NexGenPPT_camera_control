@@ -135,8 +135,7 @@ class CapturePage(ctk.CTkFrame):
         else:
             self.output_label.configure(text=result[1], text_color=theme.TEXT)
             self.summary_title.configure(text="CHECK BEFORE TAKING PHOTOS")
-            # A line per piece is set smaller, so the buttons stay on screen.
-            self.summary_label.configure(text=result[2], font=theme.font(12 if "\n" in result[2] else 13, bold=True))
+            self.summary_label.configure(text=result[2])
             self.folder_label.configure(text=f"in data/raw/camera_sessions/{datetime.date.today()}/")
         self._update_main_button()
 

@@ -1,6 +1,6 @@
 # What is being photographed: the answers from the specimen form, and what is built from them.
 #
-# One specimen alone on the paper is a plain dict, saved as it is into case_manifest.json:
+# A specimen is a plain dict, saved as it is into case_manifest.json:
 #   sample_id            "C205"                       the parent sample's ID
 #   object               "parent" | "piece" | "other"
 #   piece                "P2"                         its name, fixed by where it was cut
@@ -19,12 +19,6 @@
 #   order                "aged_then_washed" | "washed_then_aged" | a short description
 # A duration is {"value": 6.0, "unit": "hours"}, or "unknown" when the time was left empty.
 # None means the question did not apply.
-#
-# Several pieces of one sample in the same picture are a batch:
-#   sample_id, pieces_total, piece_names, notes   as above
-#   object               "pieces"
-#   pieces               one dict per piece, left to right: its "piece", its "position" on the
-#                        paper (1 is the leftmost) and its own condition
 
 import json
 import math
@@ -34,7 +28,6 @@ UNKNOWN = "unknown"
 UNITS = ["minutes", "hours", "days"]
 OBJECTS = ["parent", "piece", "other"]
 ORDERS = {"aged_then_washed": "aged, then washed", "washed_then_aged": "washed, then aged"}
-CONDITION = ["contamination", "aged", "aged_for", "washed", "wash_condition", "since_wash", "wetness", "order"]
 
 
 class InvalidSpecimen(ValueError):
@@ -67,23 +60,6 @@ def check_specimen(specimen):
     if kind == "other" and not specimen.get("description"):
         raise InvalidSpecimen("Describe what you are photographing.")
     check_condition(specimen)
-
-
-def check_batch(batch):
-    _check_sample_id(batch)
-    names = piece_names(batch)
-    pieces = batch.get("pieces") or []
-    if len(pieces) < 2:
-        raise InvalidSpecimen("Choose which pieces are on the paper.")
-    for piece in pieces:
-        _check_piece(piece.get("piece"), names)
-    if len({piece["piece"] for piece in pieces}) < len(pieces):
-        raise InvalidSpecimen("Each piece can only be on the paper once.")
-    for piece in pieces:
-        try:
-            check_condition(piece)
-        except InvalidSpecimen as problem:
-            raise InvalidSpecimen(f"{piece['piece']}: {problem}")
 
 
 def check_condition(condition):
@@ -139,7 +115,7 @@ def _check_piece(piece, names):
         raise InvalidSpecimen("Choose which piece is on the paper.")
 
 
-# Names. Photo files say the sample and pieces; the capture's folder also says the condition,
+# Names. Photo files say the sample and piece; the capture's folder also says the condition,
 # so folders can be told apart at a glance: "C205_P2_contam_aged7d_washed".
 
 def specimen_name(specimen):
@@ -150,17 +126,6 @@ def specimen_name(specimen):
 
 def folder_name(specimen):
     return "_".join([specimen_name(specimen), *_tags(specimen)])
-
-
-def batch_name(batch):
-    # "C205_P1-P2-P3-P4", left to right.
-    return f"{batch['sample_id']}_{'-'.join(piece['piece'] for piece in batch['pieces'])}"
-
-
-def batch_folder_name(batch):
-    # The condition is only in the folder name when every piece shares it.
-    tags = [_tags(piece) for piece in batch["pieces"]]
-    return "_".join([batch_name(batch), *(tags[0] if all(t == tags[0] for t in tags) else [])])
 
 
 def _tags(condition):
@@ -181,18 +146,6 @@ def summary(specimen):
     kind = specimen["object"]
     what = {"parent": "whole parent", "piece": specimen.get("piece")}.get(kind) or specimen["description"]
     return " · ".join([specimen["sample_id"], what, *_condition_parts(specimen)])
-
-
-def batch_summary(batch):
-    # One line when every piece shares a condition, otherwise a line per piece.
-    pieces = batch["pieces"]
-    conditions = [_condition_parts(piece) for piece in pieces]
-    names = ", ".join(piece["piece"] for piece in pieces)
-    if all(parts == conditions[0] for parts in conditions):
-        return " · ".join([batch["sample_id"], f"{names} left to right", "all " + conditions[0][0], *conditions[0][1:]])
-    lines = [f"{batch['sample_id']} · {names} left to right"]
-    lines += [" · ".join([piece["piece"], *parts]) for piece, parts in zip(pieces, conditions)]
-    return "\n".join(lines)
 
 
 def _condition_parts(condition):

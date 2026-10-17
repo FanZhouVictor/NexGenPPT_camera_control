@@ -17,7 +17,7 @@ class Workflow:
 WORKFLOWS = [
     Workflow(
         "specimen_photos", "Specimen photos",
-        "One specimen alone: 4 photos, you rotate it halfway · Several pieces together: 2 photos.",
+        "A whole parent or one cut piece alone on the paper · 4 photos, you rotate it halfway.",
         SpecimenPhotosPage,
     ),
 ]
